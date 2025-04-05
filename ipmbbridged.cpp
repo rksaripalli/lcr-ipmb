@@ -29,6 +29,12 @@
 #include <list>
 #include <tuple>
 #include <unordered_map>
+#include <fstream>
+#include <ostream>
+#include <chrono>
+#include <iomanip>
+#include <ctime>
+
 
 /**
  * @brief Dbus
@@ -36,6 +42,9 @@
 static constexpr const char* ipmbBus = "xyz.openbmc_project.Ipmi.Channel.Ipmb";
 static constexpr const char* ipmbObj = "/xyz/openbmc_project/Ipmi/Channel/Ipmb";
 static constexpr const char* ipmbDbusIntf = "org.openbmc.Ipmb";
+
+// debug file
+std::ofstream dbgFile("lcripmb.dbg.log");
 
 boost::asio::io_context io;
 auto conn = std::make_shared<sdbusplus::asio::connection>(io);
@@ -58,9 +67,9 @@ IpmbRequest::IpmbRequest(uint8_t address, uint8_t netFn, uint8_t rsLun,
                          const std::vector<uint8_t>& inputData) :
     address(address), netFn(netFn), rsLun(rsLun), rqSA(rqSA), seq(seq),
     rqLun(rqLun), cmd(cmd), timer(io)
-{
     data.reserve(ipmbMaxDataSize);
     state = ipmbRequestState::invalid;
+    {
 
     if (inputData.size() > 0)
     {
@@ -93,11 +102,14 @@ void IpmbRequest::i2cToIpmbConstruct(IPMB_HEADER* ipmbBuffer,
 int IpmbRequest::ipmbToi2cConstruct(std::vector<uint8_t>& buffer)
 {
     /* Add one byte for length byte as per required by driver */
+    dbgFile << "[ENTRY]:" << __FUNCTION__ << std::endl;
     size_t bufferLength = 1 + data.size() + ipmbRequestDataHeaderLength +
                           ipmbConnectionHeaderLength + ipmbChecksumSize;
 
     if (bufferLength > ipmbMaxFrameLength)
     {
+        dbgFile << __FUNCTION__ << "length of buffer to send" << bufferLength << "is greater than maximum. Error:" 
+        << ipmbMaxFrameLength << std::endl;
         return -1;
     }
 
@@ -125,6 +137,13 @@ int IpmbRequest::ipmbToi2cConstruct(std::vector<uint8_t>& buffer)
     buffer[bufferLength - ipmbChecksumSize] =
         ipmbChecksumCompute((uint8_t*)ipmbBuffer + ipmbChecksum2StartOffset,
                             (ipmbRequestDataHeaderLength + data.size()));
+
+    dbgFile <<"[EXIT:" << __FUNCTION__ <<
+        " Data size = " << data.size() <<
+        " Address = " << (int)address <<
+        " cmd =" << (int)cmd <<
+        " chk1 = " << (int)ipmbBuffer->Header.Req.checksum1 << 
+        " chk2 = " << (int)buffer[bufferLength-ipmbChecksumSize] << std::endl;
 
     return 0;
 }
@@ -854,10 +873,17 @@ auto ipmbHandleRequest =
        uint8_t lun, uint8_t cmd, std::vector<uint8_t> dataReceived) {
         IpmbChannel* channel = getChannel(reqChannel);
 
+        dbgFile << "LCR:Received dbus sendRequest" <<
+        "channel =" << reqChannel << 
+        "netfn =" << netfn <<
+        "lun = " << lun << 
+        "cmd = " << cmd << std::endl;
+
         if (channel == nullptr)
         {
             phosphor::logging::log<phosphor::logging::level::ERR>(
                 "ipmbHandleRequest: requested channel does not exist");
+            dbgFile << "Error:LCR:HandleSendRequest: no channel found" << std::endl;
             return returnStatus(ipmbResponseStatus::invalid_param);
         }
 
@@ -868,6 +894,7 @@ auto ipmbHandleRequest =
         {
             phosphor::logging::log<phosphor::logging::level::WARNING>(
                 "ipmbHandleRequest: cannot add more requests to the list");
+            dbgFile << "Error::LCR::HandleSendRequest: sequence number not available" << std::endl;
             return returnStatus(ipmbResponseStatus::busy);
         }
 
@@ -883,6 +910,7 @@ auto ipmbHandleRequest =
         {
             phosphor::logging::log<phosphor::logging::level::ERR>(
                 "ipmbHandleRequest: timer object does not exist");
+            dbgFile << "Error::LCR::HandlesendRequest: timer does not exist" << std::endl;
             return returnStatus(ipmbResponseStatus::error);
         }
 
@@ -987,6 +1015,13 @@ void addSendBroadcastHandler()
  */
 int main()
 {
+        // Get current time
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    
+        // Format and write to file
+    dbgFile << std::put_time(std::localtime(&now_c), "%Y-%m-%d %H:%M:%S")
+                << " - ipmbbridge daemon started " << std::endl;
     conn->request_name(ipmbBus);
 
     auto server = sdbusplus::asio::object_server(conn);
@@ -1001,6 +1036,8 @@ int main()
     {
         phosphor::logging::log<phosphor::logging::level::ERR>(
             "Error initializeChannels");
+        dbgFile << "[LCR:IPMBSERVICE] initializeChannels failed" << std::endl;
+        dbgFile.close();
         return -1;
     }
 
@@ -1009,5 +1046,11 @@ int main()
     addSendBroadcastHandler();
 
     io.run();
+    auto end = std::chrono::system_clock::now();
+    std::time_t end_c = std::chrono::system_clock::to_time_t(end);
+    
+        // Format and write to file
+    dbgFile << std::put_time(std::localtime(&end_c), "%Y-%m-%d %H:%M:%S")
+                << " - ipmbbridge daemon exit " << std::endl;
     return 0;
 }
