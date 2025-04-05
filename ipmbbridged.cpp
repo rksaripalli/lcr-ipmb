@@ -135,7 +135,7 @@ int IpmbRequest::ipmbToi2cConstruct(std::vector<uint8_t>& buffer)
 
     dbgFile << "LCR::IPMB::i2construct " << (int) address << " " << (int) rqSA << 
     "  " << (int) cmd << "  "  << (int) (ipmbBuffer->Header.Req.rsNetFnLUN) << (int) (ipmbBuffer->Header.Req.rqSeqLUN) <<
-    "  " << (int)(ipmbBuffer->Header.Req.checksum1) << " " << (int)(buffer[bufferLength-ipmbChecksumSize] << std::endl;
+    "  " << (int)(ipmbBuffer->Header.Req.checksum1) << " " << (int)(buffer[bufferLength-ipmbChecksumSize]) << std::endl;
 
     return 0;
 }
