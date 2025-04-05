@@ -732,7 +732,7 @@ void logbuffer(std::vector<uint8_t> &buffer)
 
     dbgFile << "LCR:IPMB. Logging buffer" << " " << " size = " << buffer.size() << std::endl;
     for (i = 0; i < 11; i++) {
-        dbgFile << "index " << i << " val " << std::hex << (int)buf[i] << std::endl;
+        dbgFile << "index " << (int)i << " val " << std::hex << (int)buf[i] << std::endl;
     }
     dbgFile << "LCR:IPMB. end Logging buffer" << std::endl;
 }
