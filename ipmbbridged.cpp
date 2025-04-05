@@ -32,6 +32,8 @@
 #include <fstream>
 #include <ostream>
 
+std::ofstream dbgFile("lcr.ipmb.log");
+
 /**
  * @brief Dbus
  */
@@ -99,6 +101,8 @@ int IpmbRequest::ipmbToi2cConstruct(std::vector<uint8_t>& buffer)
     size_t bufferLength = 1 + data.size() + ipmbRequestDataHeaderLength +
                           ipmbConnectionHeaderLength + ipmbChecksumSize;
 
+    dbgFile << "LCR:IPMB:bufferlength=" << bufferLength << std::endl;
+
     if (bufferLength > ipmbMaxFrameLength)
     {
         return -1;
@@ -128,6 +132,10 @@ int IpmbRequest::ipmbToi2cConstruct(std::vector<uint8_t>& buffer)
     buffer[bufferLength - ipmbChecksumSize] =
         ipmbChecksumCompute((uint8_t*)ipmbBuffer + ipmbChecksum2StartOffset,
                             (ipmbRequestDataHeaderLength + data.size()));
+
+    dbgFile << "LCR::IPMB::i2construct " << (int) address << " " << (int) rqSA << 
+    "  " << (int) cmd << "  " << (int)(ipmbBuffer->Header.Req.rsSQ) << "  " << (int) (ipmBuffer->Header.Req.rqSeqLun) <<
+    "  " << (int)(ipmbBuffer->Header.Req.checksum1) << " " << (int)(buffer[BufferLength-ipmbChecksumSize] << ::endl;
 
     return 0;
 }
