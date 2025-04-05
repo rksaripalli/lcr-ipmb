@@ -725,6 +725,18 @@ void IpmbChannel::addFilter(const uint8_t respNetFn, const uint8_t cmd)
     }
 }
 
+void logbuffer(std::vector<uint8_t> &buffer)
+{
+    uint8_t *buf = reinterpret_cast<uint8_t*>(buffer.data());
+    uint8_t i;
+
+    dbgFile << "LCR:IPMB. Logging buffer" << " " << " size = " << buffer.size() << std::endl;
+    for (i = 0; i < 11; i++) {
+        dbgFile << "index " << i << " val " << std::hex << (int)buf[i] << std::endl;
+    }
+    dbgFile << "LCR:IPMB. end Logging buffer" << std::endl;
+}
+
 std::tuple<int, uint8_t, uint8_t, uint8_t, uint8_t, std::vector<uint8_t>>
     IpmbChannel::requestAdd(boost::asio::yield_context& yield,
                             std::shared_ptr<IpmbRequest> request)
@@ -744,6 +756,7 @@ std::tuple<int, uint8_t, uint8_t, uint8_t, uint8_t, std::vector<uint8_t>>
 
         for (; i2cRetryCnt < ipmbI2cNumberOfRetries; i2cRetryCnt++)
         {
+            logbuffer(buffer);
             boost::asio::async_write(i2cSlaveDescriptor,
                                      boost::asio::buffer(buffer), yield[ec]);
 
