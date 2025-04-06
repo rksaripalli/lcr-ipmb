@@ -926,7 +926,7 @@ auto ipmbHandleRequest = [](boost::asio::yield_context yield,
 
 auto ipmbHandleRequestDirected = [](boost::asio::yield_context yield,
                             uint8_t targetIPMIAddress, uint8_t selfIPMIAddress,
-                            uint8_t channel,
+                            uint8_t reqChannel,
                             uint8_t netfn,
                             uint8_t lun,
                             uint8_t cmd, std::vector<uint8_t> dataReceived) {
