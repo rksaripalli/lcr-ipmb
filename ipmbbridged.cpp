@@ -353,7 +353,11 @@ void IpmbChannel::responseMatch(std::unique_ptr<IpmbResponse>& response)
             request->state = ipmbRequestState::matched;
             request->timer->cancel();
             request->matchedResponse = std::move(response);
+            dbgFile << "LCR:IPMB:responseMatch. SUCCESS" << std::endl;
         }
+    }
+    else {
+        dbgFile << "LCR:IPMB:responseMatch. FAILURE. No matching response for sequence number " << (int) (response->seq) << std::endl;
     }
 }
 
@@ -363,8 +367,12 @@ void IpmbChannel::processI2cEvent()
     IPMB_PKT* ipmbPkt = reinterpret_cast<IPMB_PKT*>(buffer.data());
     IPMB_HEADER* ipmbFrame = &(ipmbPkt->hdr);
 
+    dbgFile << "LCR:IPMB:processi2cevent. " << std::endl;
+
     lseek(ipmbi2cSlaveFd, 0, SEEK_SET);
     ssize_t r = read(ipmbi2cSlaveFd, buffer.data(), ipmbMaxFrameLength);
+
+    dbgFile << "LCR:IPMB:processi2cevent. bytes read " << (int)r << std::endl;
 
     // Handle error cases.
     if (r < 0)
@@ -383,6 +391,7 @@ void IpmbChannel::processI2cEvent()
     // valiate the frame
     if (!isFrameValid(ipmbFrame, r))
     {
+        dbgFile << "LCR:IPMB:processi2cevent. frame is not valid" << std::endl;
         goto end;
     }
 
@@ -396,6 +405,7 @@ void IpmbChannel::processI2cEvent()
         msg.append(ipmbMessageReceived.netFn, ipmbMessageReceived.cmd,
                    ipmbMessageReceived.data);
         msg.signal_send();
+        dbgFile << "LCR:IPMB:processi2cevent. IPMB channel. signal sent" << std::endl;
     }
 
     // copy frame to ipmib message buffer
