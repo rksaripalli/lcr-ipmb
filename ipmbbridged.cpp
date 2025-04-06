@@ -924,6 +924,49 @@ auto ipmbHandleRequest = [](boost::asio::yield_context yield,
     return channel->requestAdd(yield, request);
 };
 
+auto ipmbHandleRequestDirected = [](boost::asio::yield_context yield,
+                            uint8_t targetIPMIAddress, uint8_t selfIPMIAddress,
+                            uint8_t channel,
+                            uint8_t netfn,
+                            uint8_t lun,
+                            uint8_t cmd, std::vector<uint8_t> dataReceived) {
+    IpmbChannel* channel = getChannel(reqChannel);
+
+    if (channel == nullptr)
+    {
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "ipmbHandleRequest: requested channel does not exist");
+        return returnStatus(ipmbResponseStatus::invalid_param);
+    }
+
+    // check outstanding request list for valid sequence number
+    uint8_t seqNum = 0;
+    bool seqValid = channel->seqNumGet(seqNum);
+    if (!seqValid)
+    {
+        phosphor::logging::log<phosphor::logging::level::WARNING>(
+            "ipmbHandleRequest: cannot add more requests to the list");
+        return returnStatus(ipmbResponseStatus::busy);
+    }
+
+    uint8_t bmcSlaveAddress = selfIPMIAddress;
+    uint8_t rqSlaveAddress = targetIPMIAddress;
+
+    // construct the request to add it to outstanding request list
+    std::shared_ptr<IpmbRequest> request = std::make_shared<IpmbRequest>(
+        rqSlaveAddress, netfn, ipmbRsLun, bmcSlaveAddress, seqNum, lun, cmd,
+        dataReceived);
+
+    if (!request->timer)
+    {
+        phosphor::logging::log<phosphor::logging::level::ERR>(
+            "ipmbHandleRequest: timer object does not exist");
+        return returnStatus(ipmbResponseStatus::error);
+    }
+
+    return channel->requestAdd(yield, request);
+};
+
 void addUpdateSlaveAddrHandler()
 {
     // callback to handle dbus signal of updating slave addr
@@ -1028,7 +1071,11 @@ int main()
     std::shared_ptr<sdbusplus::asio::dbus_interface> ipmbIface =
         server.add_interface(ipmbObj, ipmbDbusIntf);
 
+    // Register 2 d-bus methods
+    // one for sending over a channel (which indicates source and destination)
+    // and another where we provide the values
     ipmbIface->register_method("sendRequest", std::move(ipmbHandleRequest));
+    ipmbIface->register_method("sendRequestDirected", std::move(ipmbHandleRequestDirected));
     ipmbIface->initialize();
 
     if (initializeChannels() < 0)
