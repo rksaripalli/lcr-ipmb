@@ -924,6 +924,7 @@ auto ipmbHandleRequest = [](boost::asio::yield_context yield,
     return channel->requestAdd(yield, request);
 };
 
+#if 0
 auto ipmbHandleRequestDirected = [](boost::asio::yield_context yield,
                             uint8_t targetIPMIAddress, uint8_t selfIPMIAddress,
                             uint8_t reqChannel,
@@ -966,6 +967,8 @@ auto ipmbHandleRequestDirected = [](boost::asio::yield_context yield,
 
     return channel->requestAdd(yield, request);
 };
+
+#endif
 
 void addUpdateSlaveAddrHandler()
 {
@@ -1075,7 +1078,7 @@ int main()
     // one for sending over a channel (which indicates source and destination)
     // and another where we provide the values
     ipmbIface->register_method("sendRequest", std::move(ipmbHandleRequest));
-    ipmbIface->register_method("sendRequestDirected", std::move(ipmbHandleRequestDirected));
+    //ipmbIface->register_method("sendRequestDirected", std::move(ipmbHandleRequestDirected));
     ipmbIface->initialize();
 
     if (initializeChannels() < 0)
