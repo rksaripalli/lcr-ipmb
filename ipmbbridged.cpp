@@ -924,51 +924,24 @@ auto ipmbHandleRequest = [](boost::asio::yield_context yield,
     return channel->requestAdd(yield, request);
 };
 
-#if 0
-auto ipmbHandleRequestDirected = [](boost::asio::yield_context yield,
-                            uint8_t targetIPMIAddress, uint8_t selfIPMIAddress,
-                            uint8_t reqChannel,
-                            uint8_t netfn,
-                            uint8_t lun,
-                            uint8_t cmd, std::vector<uint8_t> dataReceived) {
-    IpmbChannel* channel = getChannel(reqChannel);
+bool ipmbAddChannel(int bus, uint8_t bmci2caddress, uint8_t devicei2caddress, const std::string& channelName)
+{
+    std::shared_ptr<IpmbCommandFilter> commandFilter =
+        std::make_shared<IpmbCommandFilter>();
 
-    if (channel == nullptr)
+    const std::string& typeConfig = "ipmb";
+    ipmbChannelType type = ipmbChannelTypeMap.at(typeConfig);
+
+    auto channel = ipmbChannels.emplace(
+        ipmbChannels.end(), io, bmci2caddress << 2, devicei2caddress << 2,
+        ((0 << 2) | static_cast<uint8_t>(type)), commandFilter);
+    if (channel->ipmbChannelInit(channelName.c_str()) < 0)
     {
         phosphor::logging::log<phosphor::logging::level::ERR>(
-            "ipmbHandleRequest: requested channel does not exist");
-        return returnStatus(ipmbResponseStatus::invalid_param);
+            "initializeChannels: channel initialization failed");
+        return -1;
     }
-
-    // check outstanding request list for valid sequence number
-    uint8_t seqNum = 0;
-    bool seqValid = channel->seqNumGet(seqNum);
-    if (!seqValid)
-    {
-        phosphor::logging::log<phosphor::logging::level::WARNING>(
-            "ipmbHandleRequest: cannot add more requests to the list");
-        return returnStatus(ipmbResponseStatus::busy);
-    }
-
-    uint8_t bmcSlaveAddress = selfIPMIAddress;
-    uint8_t rqSlaveAddress = targetIPMIAddress;
-
-    // construct the request to add it to outstanding request list
-    std::shared_ptr<IpmbRequest> request = std::make_shared<IpmbRequest>(
-        rqSlaveAddress, netfn, ipmbRsLun, bmcSlaveAddress, seqNum, lun, cmd,
-        dataReceived);
-
-    if (!request->timer)
-    {
-        phosphor::logging::log<phosphor::logging::level::ERR>(
-            "ipmbHandleRequest: timer object does not exist");
-        return returnStatus(ipmbResponseStatus::error);
-    }
-
-    return channel->requestAdd(yield, request);
-};
-
-#endif
+}
 
 void addUpdateSlaveAddrHandler()
 {
@@ -1078,6 +1051,7 @@ int main()
     // one for sending over a channel (which indicates source and destination)
     // and another where we provide the values
     ipmbIface->register_method("sendRequest", std::move(ipmbHandleRequest));
+    ipmbIface->register_method("AddChannel", std::move(ipmbAddChannel));
     //ipmbIface->register_method("sendRequestDirected", std::move(ipmbHandleRequestDirected));
     ipmbIface->initialize();
 
