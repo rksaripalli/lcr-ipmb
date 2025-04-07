@@ -931,8 +931,8 @@ auto ipmbHandleRequest = [](boost::asio::yield_context yield,
 bool ipmbAddChannel(
     int bus,
     uint8_t bmci2caddress,
-    uint8_t devicei2caddress,
-    const std::string& channelName)
+    uint8_t devicei2caddress
+)
 {
     std::shared_ptr<IpmbCommandFilter> commandFilter =
         std::make_shared<IpmbCommandFilter>();
@@ -943,7 +943,9 @@ bool ipmbAddChannel(
     auto channel = ipmbChannels.emplace(
         ipmbChannels.end(), io, bmci2caddress << 2, devicei2caddress << 2,
         ((devIndex << 2) | static_cast<uint8_t>(type)), commandFilter);
-    if (channel->ipmbChannelInit(channelName.c_str()) < 0)
+
+    std::string path = "/dev/ipmb-" + std::to_string(bus);
+    if (channel->ipmbChannelInit(path.c_str()) < 0)
     {
         phosphor::logging::log<phosphor::logging::level::ERR>(
             "initializeChannels: channel initialization failed");
