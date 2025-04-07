@@ -33,6 +33,7 @@
 #include <ostream>
 
 std::ofstream dbgFile("lcr.ipmb.log");
+uint8_t devIndex = 0;
 
 /**
  * @brief Dbus
@@ -842,7 +843,7 @@ static int initializeChannels()
     }
     try
     {
-        uint8_t devIndex = 0;
+        //uint8_t devIndex = 0;
         auto data = nlohmann::json::parse(configFile, nullptr);
         for (const auto& channelConfig : data["channels"])
         {
@@ -866,6 +867,9 @@ static int initializeChannels()
                 phosphor::logging::log<phosphor::logging::level::ERR>(
                     "initializeChannels: channel initialization failed");
                 return -1;
+            }
+            else {
+                devIndex += 1;
             }
         }
     }
@@ -924,7 +928,11 @@ auto ipmbHandleRequest = [](boost::asio::yield_context yield,
     return channel->requestAdd(yield, request);
 };
 
-bool ipmbAddChannel(int bus, uint8_t bmci2caddress, uint8_t devicei2caddress, const std::string& channelName)
+bool ipmbAddChannel(
+    int bus,
+    uint8_t bmci2caddress,
+    uint8_t devicei2caddress,
+    const std::string& channelName)
 {
     std::shared_ptr<IpmbCommandFilter> commandFilter =
         std::make_shared<IpmbCommandFilter>();
@@ -934,13 +942,15 @@ bool ipmbAddChannel(int bus, uint8_t bmci2caddress, uint8_t devicei2caddress, co
 
     auto channel = ipmbChannels.emplace(
         ipmbChannels.end(), io, bmci2caddress << 2, devicei2caddress << 2,
-        ((0 << 2) | static_cast<uint8_t>(type)), commandFilter);
+        ((devIndex << 2) | static_cast<uint8_t>(type)), commandFilter);
     if (channel->ipmbChannelInit(channelName.c_str()) < 0)
     {
         phosphor::logging::log<phosphor::logging::level::ERR>(
             "initializeChannels: channel initialization failed");
-        return -1;
+        return false;
     }
+
+    return true;
 }
 
 void addUpdateSlaveAddrHandler()
@@ -1051,7 +1061,7 @@ int main()
     // one for sending over a channel (which indicates source and destination)
     // and another where we provide the values
     ipmbIface->register_method("sendRequest", std::move(ipmbHandleRequest));
-    ipmbIface->register_method("AddChannel", std::move(ipmbAddChannel));
+    ipmbIface->register_method("AddChannel", ipmbAddChannel);
     //ipmbIface->register_method("sendRequestDirected", std::move(ipmbHandleRequestDirected));
     ipmbIface->initialize();
 
